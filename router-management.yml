@@ -5,15 +5,23 @@
   gather_facts: false
 
   tasks:
-    - name: Configure Access Control List
+    - name: Configure Named Access Control List
       cisco.ios.ios_config:
         lines:
-        - 10 permit ip any host 8.8.8.8 
-        - 20 permit ip any host 4.2.2.2
+        - 10 permit udp any host 8.8.8.8 eq domain
+        - 20 permit udp any host 4.2.2.2 eq domain
         parents: ip access-list extended AnsibleACL
         before: no ip access-list extended AnsibleACL
         match: exact
-    
+
+    - name: Configure Numbered Access Control List
+      cisco.ios.ios_config:
+        lines:
+        - access-list 100 permit udp any host 8.8.8.8 eq domain
+        - access-list 100 permit udp any host 4.2.2.2 eq domain
+        before: no access-list 100
+        match: exact
+
     - name: Configure IGP Connection
       cisco.ios.ios_config:
         lines:
