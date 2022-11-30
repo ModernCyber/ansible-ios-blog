@@ -1,0 +1,8 @@
+radius-server attribute 6 on-for-login-auth
+radius-server attribute 6 support-multiple
+radius-server attribute 8 include-in-access-req
+radius-server attribute 25 access-request include
+radius-server attribute 31 mac format ietf upper-case
+radius-server attribute 31 send nas-port-detail mac-only
+radius-server dead-criteria time 5 tries 3
+radius-server deadtime 3

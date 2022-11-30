@@ -1,0 +1,33 @@
+ip dhcp snooping vlan 1-4096
+ip dhcp snooping
+!
+device-sensor filter-list lldp list iseLLDP
+ tlv name system-name
+ tlv name system-description
+ tlv name system-capabilities
+!
+device-sensor filter-list dhcp list iseDHCP
+ option name host-name
+ option name parameter-request-list
+ option name class-identifier
+ option name v-i-vendor-class
+!
+device-sensor filter-list cdp list iseCDP
+ tlv name device-name
+ tlv name capabilities-type
+ tlv name version-type
+ tlv name platform-type
+device-sensor filter-spec dhcp include list iseDHCP
+device-sensor filter-spec lldp include list iseLLDP
+device-sensor filter-spec cdp include list iseCDP
+device-sensor notify all-changes
+!
+access-session attributes filter-list list Def_Acct_List
+ cdp
+ lldp
+ dhcp
+ http
+access-session accounting attributes filter-spec include list Def_Acct_List
+access-session acl default passthrough
+!
+device-tracking tracking

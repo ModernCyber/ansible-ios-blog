@@ -1,0 +1,146 @@
+---
+
+- name: Cisco Switch Management
+  hosts: switches
+  gather_facts: false
+
+  tasks:
+    - name: Verify Authentication Config Mode
+      cisco.ios.ios_command:
+        commands:
+        - authentication display config-mode
+      register: configMode
+
+    - name: Enable IBNS 2.0 Configuration Display
+      ansible.netcommon.cli_command:
+        command: "{{ item }}"
+        prompt: continue
+        answer: 'yes'
+      with_items:
+      - configure terminal
+      - authentication convert-to new-style
+      when: configMode.stdout_lines is search("legacy")
+
+    - name: Configure Radius Servers
+      cisco.ios.ios_config:
+        lines:
+        - address ipv4 {{ item.ip }} auth-port {{ item.authPort }} acct-port {{ item.acctPort }}
+        - timeout 4
+        - retransmit 3
+        - key 0 {{ item.secret }}
+        parents: radius server {{ item.name }}
+      with_items:
+      - '{{ radius_servers }}'
+      
+    - name: Configure Radius Server Group
+      cisco.ios.ios_config:
+        lines:
+        - server name {{ item.name }}
+        - ip radius source-interface Loopback{{ mgmt_loop_num }}
+        parents: aaa group server radius {{ radius_server_group }}
+      with_items:
+      - '{{ radius_servers }}'
+
+    - name: Configure AAA 802.1X Methods
+      cisco.ios.ios_config:
+        lines:
+        - aaa authentication dot1x default group ise-radius-group
+        - aaa authorization network default group ise-radius-group 
+        - aaa authorization network dnac-cts-list group ise-radius-group 
+        - aaa accounting update newinfo periodic 2880
+        - aaa accounting identity default start-stop group ise-radius-group
+
+    - name: Configure CoA Dynamic Author 
+      cisco.ios.ios_config:
+        lines:
+        - client {{ item.ip }} server-key 0 {{ item.secret }}
+        parents: aaa server radius dynamic-author 
+      with_items:
+      - '{{ radius_servers }}'
+
+    - name: Apply Radius Server Attributes Jinja
+      cisco.ios.ios_config:
+        src: ibns2-radius-attributes.j2
+
+    - name: Apply Service Templates Jinja
+      cisco.ios.ios_config:
+        src: ibns2-service-templates.j2
+
+    - name: Apply Class Map Jinja 
+      cisco.ios.ios_config:
+        src: ibns2-class-maps.j2
+
+    - name: Apply Closed Auth Policy Map Map Jinja 
+      cisco.ios.ios_config:
+        src: ibns2-closed-auth-policy.j2
+
+    - name: Apply Device Sensor and IP Device Tracking Jinja 
+      cisco.ios.ios_config:
+        src: ibns2-ds-ipdt.j2
+
+    - name: Apply ErrDisable Recovery Jinja 
+      cisco.ios.ios_config:
+        src: ibns2-errdisable.j2
+
+    - name: Configure HTTP Server Settings
+      cisco.ios.ios_config:
+        lines:
+        - ip http server
+        - ip http authentication local
+        - ip http secure-server
+        - ip http max-connections 16
+        - ip http client source-interface Loopback{{ mgmt_loop_num }}
+
+    - name: Configure Web-Auth Redirect ACL
+      cisco.ios.ios_config:
+        lines:
+        -  40 deny   ip any host {{ radius_servers[0].ip }}
+        -  50 deny   ip any host {{ radius_servers[1].ip }}
+        - 500 permit tcp any any eq www
+        - 600 permit tcp any any eq 443
+        - 700 permit tcp any any eq 8443
+        - 800 deny   udp any any eq domain
+        - 900 deny   udp any eq bootpc any eq bootps
+        parents: ip access-list extended ACL_WEBAUTH_REDIRECT
+        before: no ip access-list extended ACL_WEBAUTH_REDIRECT
+        match: exact
+    
+    - name: Configure Critical Auth ACL
+      cisco.ios.ios_config:
+        lines:
+        - 10 permit ip any any
+        parents: ip access-list extended IPV4_CRITICAL_AUTH_ACL
+        before: no ip access-list extended IPV4_CRITICAL_AUTH_ACL
+        match: exact
+
+    - name: Configure Pre-Auth ACL
+      cisco.ios.ios_config:
+        lines:
+        - 10 permit udp any any eq bootps
+        - 20 permit udp any any eq bootpc
+        - 30 permit udp any any eq domain
+        - 40 deny   ip any any
+        parents: ip access-list extended IPV4_PRE_AUTH_ACL
+        before: no ip access-list extended IPV4_PRE_AUTH_ACL
+        match: exact
+
+    - name: Configure Access Ports
+      cisco.ios.ios_config:
+        lines:
+        - switchport mode access
+        - switchport access vlan {{ access_vlan }}
+        - switchport voice vlan {{ voice_vlan }}
+        - ip device tracking probe interval 30
+        - dot1x timeout tx-period 7
+        - dot1x max-reauth-req 3
+        - source template DefaultWiredDot1xClosedAuth
+        - spanning-tree portfast
+        - spanning-tree bpduguard enable
+        parents: '{{ item }}'
+      with_items: 
+      - interface gigabitethernet0/2
+      - interface gigabitethernet0/3
+
+    - name: Save Configuration
+      cisco.ios.ios_config:
+        save_when: modified

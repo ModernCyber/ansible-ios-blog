@@ -1,0 +1,16 @@
+    - name: Reboot to IBNS2 Authentication Mode
+      ansible.netcommon.cli_command:
+        command: reload
+        prompt:
+          - confirm
+        answer:
+          - 'y'
+      when: configMode.stdout_lines is search("legacy")
+
+    - name: Wait for device reload to complete
+      wait_for:
+        host: "{{ inventory_hostname }}"
+        port: 22
+        delay: 90
+      when: configMode.stdout_lines is search("legacy")
+      delegate_to: localhost
