@@ -44,11 +44,11 @@
     - name: Configure AAA 802.1X Methods
       cisco.ios.ios_config:
         lines:
-        - aaa authentication dot1x default group ise-radius-group
-        - aaa authorization network default group ise-radius-group 
-        - aaa authorization network dnac-cts-list group ise-radius-group 
+        - aaa authentication dot1x default group {{ radius_server_group }}
+        - aaa authorization network default group {{ radius_server_group }} 
+        - aaa authorization network dnac-cts-list group {{ radius_server_group }} 
         - aaa accounting update newinfo periodic 2880
-        - aaa accounting identity default start-stop group ise-radius-group
+        - aaa accounting identity default start-stop group {{ radius_server_group }}
 
     - name: Configure CoA Dynamic Author 
       cisco.ios.ios_config:
@@ -127,12 +127,8 @@
     - name: Configure Access Ports
       cisco.ios.ios_config:
         lines:
-        - switchport mode access
         - switchport access vlan {{ access_vlan }}
         - switchport voice vlan {{ voice_vlan }}
-        - ip device tracking probe interval 30
-        - dot1x timeout tx-period 7
-        - dot1x max-reauth-req 3
         - source template DefaultWiredDot1xClosedAuth
         - spanning-tree portfast
         - spanning-tree bpduguard enable

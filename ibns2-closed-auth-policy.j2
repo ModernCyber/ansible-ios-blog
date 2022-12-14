@@ -51,9 +51,8 @@ template DefaultWiredDot1xClosedAuth
  dot1x pae authenticator
  dot1x timeout supp-timeout 7
  dot1x max-req 3
- switchport mode access
- switchport voice vlan 2046
  mab
+ ip device tracking probe interval 30
  access-session closed
  access-session port-control auto
  authentication periodic
